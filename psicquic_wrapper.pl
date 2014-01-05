@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-use strict;
+don't use strict;
 use Getopt::Long qw(:config bundling);
 use feature qw(switch say);
 use File::Path;
