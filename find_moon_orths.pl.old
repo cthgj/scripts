@@ -1,0 +1,182 @@
+#! /usr/bin/perl -w
+
+use strict;
+use Getopt::Std;
+our $verbose;
+our $debug;
+sub v_say;
+sub debug;
+require "MY_SUBS.pl";
+
+
+#die "Need at least 2 arguments, the moonGO outfile (1st arg) and an uutfile of metaphors.pl (2nd arg)\n" unless $ARGV[1];
+
+my (%synonyms,%cands, %opts, %orths, %mapped, %has_orth, %moon);
+getopts('hvpm:M:r:s:',\%opts) || do { print "Try '" .  this_script_name() . " -h' for more information\n"; exit(1); };
+
+my $no_map=undef;
+my $species=$opts{s}||'human';
+my $synfile=$opts{m}||undef;
+my $results_dir=$opts{r}||"./results";
+my $MODES=$opts{M}||"I,B";
+
+$no_map=1 unless $synfile;
+$synonyms{LOADED}=0;
+## Parse moonGO outfile
+open(my $moon_file, "<", $ARGV[0]) || die " Could not open $ARGV[0] : $!\n";
+while (<$moon_file>) {
+    next if /^\s/;
+    next if /^\#/;
+    chomp;
+    /^(.+?)\s/;
+    my $a=$1;
+    $cands{get_name($a,1)}=$a;
+    
+}
+
+open(my $orths_file, "<", $ARGV[1]) || die " Could not open $ARGV[1] : $!\n";
+while (<$orths_file>){
+    chomp;
+    my @a=split(/\s+/);
+    ## Get the cand name
+    my $cand=get_name(shift(@a),1);
+    next unless defined($cands{$cand});
+    ## Collect the orthologs (ACs) for this cand (ID)
+    map{$orths{$cand}{$_}++;}@a;
+}
+
+
+
+# ## Map each ortholog AC to its ID using uniprot_map.pl
+# my @to_map;
+# my %k;
+# ## Collect the ACs we want to map
+# foreach my $cc (keys(%orths)) {
+#     map{$k{$_}++}keys(%{$orths{$cc}});
+# }
+
+## Print to tmp file and run uniprot_map.pl
+# open(my $tmp_fh, ">" , "/tmp/$$.acs") || die "Could not open /tmp/$$.acs for writting : $!\n";
+# map{print $tmp_fh "$_\n"}keys(%k);
+# print STDERR "uniprot_map.pl -vf ACC -t ID /tmp/$$.acs\n";
+# my $MAP=`uniprot_map.pl -vf ACC -t ID /tmp/$$.acs`;
+# my @lines=split(/\n/, $MAP);
+# foreach my $line (@lines) {
+#     next unless $line=~/\w/;
+#     my @a=split(/\s+/, $line);
+#     die("$a[0] is already mapped to $mapped{$a[0]}\n") if defined($mapped{$a[0]});
+#     $mapped{$a[0]}=$a[1];
+# }
+
+## now, check which of my cands has an ortholog in which species
+foreach my $cand (keys(%cands)) {
+    foreach my $orth (keys(%{$orths{$cand}})) {
+	my $name=get_name($orth,1);
+	## skip unmapped
+	next if $name eq $orth;
+	my @a=split(/_/,$name);
+	$has_orth{$cand}{$a[1]}{$name}++;
+    }
+}
+my @species=qw(HUMAN MOUSE DROME CAEEL YEAST);
+my %sp_map=(
+	    'human' => 'HUMAN',
+	    'mouse' => 'MOUSE',
+	    'fly'   => 'DROME',
+	    'worm'  => 'CAEEL',
+	    'yeast' => 'YEAST',
+	    'HUMAN' => 'human',
+	    'MOUSE' => 'mouse',
+	    'DROME' => 'fly',
+	    'CAEEL' => 'worm',
+	    'YEAST' => 'yeast',
+);
+if ($opts{p}) {
+    map{
+	print "$_\t";
+	foreach my $s(@species) {
+	    next if /$s/;
+	    print "$s " if defined($has_orth{$_}{$s}) 
+	}
+	print "\n";
+    }keys(%has_orth);
+}
+
+
+# For each candidate, check if any of its orths 
+# in other species are also cands
+my @mm=split(/,/, $MODES);
+my %modes;
+map{$modes{$_}++}@mm;
+my @moon_files;
+opendir(RES, $results_dir) || die "Could not open results directory $results_dir for reading: $!\n";
+
+
+## Read ONLY files, and only moonGO out files
+my @rr=grep { (/^(.+?)\.(\w)\.moon$/) && -f "$results_dir/$_" && defined($modes{$2})} readdir(RES);
+#my @rr=grep { -f $results_dir/$_ && /\.moon/     } readdir(RES);
+foreach my $file (@rr) {
+    $file =~ /(.+)\.(.+?)\.moon/;
+    my $sp=$sp_map{$1};
+    my $mode = $2;
+    ## Read only the desired modes
+    next unless $modes{$mode};
+    my $ff=check_file("$results_dir/$file", 'r');
+    while (<$ff>) {
+	next if /^\s/;
+	next if /^\#/;
+	chomp;
+	/^(.+?)\s/;
+	$moon{$sp}{$1}++;
+    }
+}
+
+foreach my $cand (keys(%cands)) {
+    my $i=0;
+    foreach my $o (keys(%{$orths{$cand}})) {
+	# next unless defined($mapped{$o});
+	next unless defined($moon{&get_name($o,1)});
+	print "$cand \t" if $i==0;
+	$i=1;
+	print &get_name($o,1) . " ";
+    }
+    print "\n" unless $i==0;
+}
+
+############################################################
+sub get_name{
+    my $name=$_[0];
+    return ($name) if $no_map ;
+    my $old_name=$name;
+    my $reverse=$_[1]||undef;
+    if ($synonyms{LOADED}==0){
+	if(-e $synfile){
+	    open(S,$synfile);
+	    while(<S>){
+		chomp;
+		if(/^([^\t]+?)\t([^\t]+)$/){
+		    $synonyms{NAME}{$2}=$1; 
+		    $synonyms{ACC}{$2}=$2; 
+		    $synonyms{NAME}{$1}=$1; 
+		    $synonyms{ACC}{$1}=$2; 
+		    # print "\$synonyms{NAME}{$2} : $synonyms{NAME}{$2}\n\$synonyms{ACC}{$2} : $synonyms{ACC}{$2}";
+		}
+		else{
+		    die("Bad format synonyms file : $synfile\n");
+		}
+	    }
+	    close(S);
+	}
+	else{die("Could not open $synfile\n" );	}	
+ 	$synonyms{LOADED}=1;
+    }
+    unless (defined($synonyms{NAME}{$old_name})){
+	$synonyms{NAME}{$old_name}=$name;
+    }
+    unless (defined($synonyms{ACC}{$old_name})){
+	$synonyms{ACC}{$old_name}=$name
+    }
+    $reverse ? 
+	($name=$synonyms{NAME}{$old_name}) : ($name=$synonyms{ACC}{$old_name});
+  return $name;
+}

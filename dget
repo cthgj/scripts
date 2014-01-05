@@ -1,0 +1,11 @@
+#!/usr/bin/perl 
+my $source = $ARGV[0] || &usage("USAGE: dget SOURCE DEST\nNeed a source file");
+my $dest = $ARGV[1] || &usage("USAGE: dget SOURCE DEST\nNeed a destination");
+print "scp terdon\@docpad.local:$source $dest\n";
+system("scp terdon\@docpad.local:$source $dest");
+
+
+sub usage{
+print "$_[0]\n";
+exit(0);
+}

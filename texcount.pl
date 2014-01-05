@@ -1,0 +1,1 @@
+../Setups/TeXcount/texcount.pl

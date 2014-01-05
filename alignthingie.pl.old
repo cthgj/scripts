@@ -1,0 +1,1059 @@
+#!/usr/local/bin/perl -w
+
+
+
+
+use strict;
+use Getopt::Std;
+use Data::Dumper;
+
+my $skipped_hits = 0;
+my $skipped_hitsA = 0;
+my $bit=0;
+my $c = 0;
+my $counter = 0;
+my $score_line = undef;
+my ( $letters, $length, $idval, $evalue, $score, $query_ID, $bits, $identities, $subject_ID, $id, $info, $q_match, $hsp_start, $hsp_end, $middle_line,$previous_mid_line, $previous_line,$read_next_line,$hit_line);
+my ( %subjects,%query,%subj,%hits,%scores, %evalue,%previous_mid_line, %hit_lines, %nohits, %wanted);
+my ( @ids, @frames, @subjects, @hsps, @infos, @algnments,@hit,@q_matches );
+my $gotahit = 0;
+my $frame = ""; ## initialise frame to empty string, in case working with blastn or blastp
+my $query_counter = 0;
+my $best_printed = 0;  ## yet another counter
+my $specific_hits = 0; ## yes,still another counter
+my $first_run_of_sub_gff = 1; ## counter to run smthng jus once at sub gff_output
+my $specific = undef; ## Have we asked for a specific list of queries/subjects?
+my %opts;
+getopts('c:e:i:l:m:M:r:R:q:s:I:g:Q:T:f:SdvkhbB',\%opts) || do { print "Invalid option, try 'AlignCys2ESTs.pl -h' for more information\n"; exit(1); };
+&usage() if $opts{h};
+unless ($ARGV[0])
+{
+    print STDERR "****\nNeed a blast file!! Try alignthingie.pl -h for more information.\n****\n";
+    exit(1);
+    
+}
+
+my $filename = $ARGV[0] || die("Cannot open file $ARGV[0] : $!\n");
+
+#die("$filename.gff exists from a previous instance, please remove\n") if -r "$filename.gff";
+### Set command line options and thresholds	 ###
+my $SCOREMIN   = $opts{m} || 0;      # minimum score allowed
+my $SCOREMAX   = $opts{M} || 10000;  # maximum   >>    >>
+my $EVALUE     = $opts{e} || 1;      # minimum evalue  >>
+my $IDENTITY   = $opts{i} || 1;      #   >>    identity allowed
+my $IDMAX      = $opts{I} || 100;    # maximum    >>      >>
+my $SECAROUND  = $opts{R} || 6;      # Length of region around matched residue to check for conservation ($SECAROUND-matched residue-$SECAROUND)
+my $CONS_LEFT  = $opts{l} || 3;      # Minimum number of conserved residues (or '+') allowed on the left side of the matched residue
+my $CONS_RIGHT = $opts{r} || 3;      # Minimum number of conserved residues (or '+') allowed on the right side of the matched residue
+my $CONS_ALL   = $opts{c} || 6;      # Minimum number of conserved residues (or '+') allowed  in the 2 $SECAROUND
+my $QMATCH     = $opts{q} || '\*';   # aa in the query seq.
+my $SMATCH     = $opts{s} || '\*';   # aa in subjct string 
+my $chck_cons  = $opts{k} || 1;      # Check conservation?
+my $debug      = $opts{d} || undef;  # debugging info
+my $verbose    = $opts{v} || 0;      # Verbosity
+my $strict     = $opts{S} || undef;  # Strict options, see if($strict) below
+my $gff        = $opts{g} || undef;  # Produce gff output for sub or query
+my $best       = $opts{b} || undef;  # Only return a single hit with the lowest evalue
+my $single_best= $opts{B} || undef;  # Return all hits which share the lowest evalue
+my $query_list = $opts{Q} || undef;  # Return only those HSP whose query is in $query_list (filename passed at cmndline)
+my $sbjct_list = $opts{T} || undef;  # Return only those HSPs whose subject is in $sbjct_list (filename passed at cmndline)
+my $no_self    = $opts{f} || undef;  # Do not return hits against same species
+
+
+# This is necessery for the functions
+$best = 1 if $single_best;
+
+
+
+if($gff){
+die("****** ERROR ******\n-g option value must be \"s\" or \"q\"\n****** ERROR ******\n") unless $gff eq "s" || $gff eq "q";
+}
+if($strict)
+{
+    $EVALUE     =  0.01;
+    $SCOREMIN   =  50;
+    $IDENTITY   =  65;
+    $CONS_LEFT  =  4;
+    $CONS_RIGHT =  4;
+    $SECAROUND  =  8;
+    $CONS_ALL   =  10;
+}
+
+
+## Get list of words to be avoided
+my @no_selfs = split /\s+/, $no_self if $no_self;
+
+
+## Get query or sbjct lists if present
+if ($sbjct_list)
+{
+    $specific = 1;
+    if (-e $sbjct_list )
+    {
+	open (A, "$sbjct_list");
+	while(<A>)
+	{
+	    /^(.*)\s/;
+	    $wanted{$1}++;
+	}
+	close(A);
+    }
+    else {$wanted{$sbjct_list}++; }
+}
+if ($query_list)
+{
+    $specific = 1;
+    if (-e $query_list )
+    {
+	open (B, "$query_list");
+	while(<B>)
+	{
+	    /^(.*)\s/;
+	    $wanted{$1}++;
+	}
+	close(B);
+    }
+    else {$wanted{$query_list}++; }
+}
+
+my $qlength;
+if ($QMATCH =~ /\\/){ my $qm = $QMATCH;  $qm =~ s/\\//; $qlength = length($qm); } 
+else { $qlength = length($QMATCH)}
+
+## Check that the options are all right
+my @jj = keys(%opts);
+my @numbers = ($SCOREMIN, $SCOREMAX, $EVALUE, $IDENTITY, $SECAROUND, $CONS_LEFT, $CONS_RIGHT, $CONS_ALL);
+
+foreach my $number (@numbers)
+{
+  die("*** PROBLEM : \"$number\" is not a valid value, must use a number\ntry 'alignthingie.pl -h' for more information\n")  unless $number =~ /^[\d\.]+$/;
+}
+
+##  Do not check conservation
+$chck_cons = 0 if $opts{k};
+
+### remove '\' from SMATCH for the eq operator. (usefull if pattern is '\*')
+if ($SMATCH =~ /\\/)  
+{
+    $SMATCH =~ /\\(.)/;
+    $SMATCH = $1;
+}
+
+## counts how many hsps hit
+my $actual_hits = 0;
+
+
+if ($debug)
+{
+    print STDERR "\$SCOREMIN    = $SCOREMIN\n";
+    print STDERR "\$SCOREMAX    = $SCOREMAX \n";
+    print STDERR "\$EVALUE      = $EVALUE\n";
+    print STDERR "\$IDENTITY    = $IDENTITY\n";
+    print STDERR "\$IDMAX       = $IDMAX\n";
+    print STDERR "\$SECAROUND   = $SECAROUND\n";
+    print STDERR "\$CONS_LEFT   = $CONS_LEFT\n";
+    print STDERR "\$CONS_RIGHT  = $CONS_RIGHT \n";
+    print STDERR "\$CONS_ALL    = $CONS_ALL\n";
+    print STDERR "\$QMATCH      = \'$QMATCH\'\n";
+    print STDERR "\$SMATCH      = \'$SMATCH\'\n";
+    print STDERR "\$chck_cons   = $chck_cons \n";
+    print STDERR "\$debug       = $debug\n";
+    print STDERR "\$verbose     = $verbose\n";
+    print STDERR "\$best        = $best\n";
+    print STDERR "\$single_best = $single_best\n";
+}
+
+
+
+my $isblast = undef;
+while(<>)
+{
+    next if /^\s+$/;
+    unless($isblast)
+    {
+	die("***\nFile $filename is not a blast outfile!\n***\n") unless /BLAST/;
+	$isblast = 1;
+
+    }
+    
+    
+      	
+#=======================================#
+# Get query name and empty	        #
+# @algnments from previous query        #
+#=======================================#
+    if (/^Query=/)
+    {	
+	$query_counter++;
+	if ($verbose == 1)
+	{
+	    print STDERR "."  if $query_counter % 10 == 0; 
+	    print STDERR "[$query_counter]\n" if $query_counter % 1000 ==0; 
+	}	
+	if($query_ID)  ## If this is not the first query
+	{
+	    @algnments = ();
+	}
+	/Query=\s(.*)/;
+	$query_ID = $1;
+	&debug("###################################\nQuery : $query_ID\n");
+	## initialise $nohits to 0, if it stays at 0 there are hits
+	$nohits{$query_ID} = 0;
+	next;
+    }
+
+#===========================================#
+# Get query length and put into hash	    #
+# $letters = length		            #
+#===========================================#
+    if (/letters\)/)
+    {
+	/(\d+)/;
+	$letters = $1;
+	next;
+    }
+
+
+    if (/^>/) 
+    {      
+        ## @hsps = list of lines of last hsp
+	## @alignments = list of hsps for last subject
+	if($subject_ID)  ### if this is NOT the first sbjct for this query
+	{	
+	    push @algnments, [@hsps];
+	    ## Make $a = unique name for this hsp
+	    my $a = $subject_ID . $query_ID;   
+	    $subjects{$a} = [@algnments]; 
+	    &check_for_hits($a,"1");
+	    @hsps = ();
+	    @algnments=();
+	   
+	}
+
+	#===================================================#
+        # Counter counts number of hsps per sub/quer	    #
+	# so, set to 0 because we just got a new sub	    #
+        #===================================================#
+	$counter=0;
+
+	$subject_ID = $_;
+	chomp $subject_ID;
+	
+	## @subjects = list of subject ids
+	push @subjects, $subject_ID;
+	
+	&debug("Subject : $subject_ID");
+	next;	    
+    }	
+
+    ## self explanatory
+    if (/No\shits\sfound/)
+    {
+	$nohits{$query_ID} = 1;
+	next;
+    }
+    ## Get length 
+    if (/Length/)
+    {
+	/=\s+(\d*)/ || die("$_\n");
+	$length = $1;
+	
+    }
+  
+### get score line
+    if(/^\s?Score\s+=/)
+    {  	
+        
+
+	if ($counter>0)  ## if this is not the first HSP for this sub-quer pair
+	{
+	    ### usefull to give each hsp of this sub-quer pair unique name
+	    my $c = $counter -1;
+	    my $a = $subject_ID . $query_ID . $c;
+	    push @algnments, [@hsps];   ## @algnments contains the list of lines of the last HSP (query, subject, middle)
+  	    @hsps = ();                   ## @hsps back to () in readiness for the next one.
+	}
+	## Counter counts number of hsps per sub/quer
+	$counter++;
+	$score_line = $_;
+	chomp $score_line;
+	/=\s+([\d\.]+)\s.*=\s+(.*)/ || die("score or eval problem $. :  $_\n"); 
+	$score = $1;
+	$evalue = $2;
+	if ($evalue =~ /^\s?e/)
+	{
+	    $evalue = "1" . $evalue;
+	}
+	
+	## see line 262 for explanation 
+	$bit = 1;
+
+	/^.*?=\s(.*?)\sbits/;
+#	$bits = $1;  ### get bit score, am not using it at the moment....
+	
+    }
+### Get Identities line
+    if (/Identities/)
+    {
+	$identities = $_;
+	chomp $identities;
+	/^.*?\(((\d{1,3})%)\)/ || die("identities problem $. : $_ \n");
+	$id = " Identities : " . $1;  ## Actual identities %age
+	$idval = $2;
+
+	
+	next;
+    }
+### Get frame 
+
+    if (/Frame/)
+    {
+	next if /MatID/;
+	/Frame\s=\s(..)/;
+	$frame = $_;#" Frame : " . $1 || ""; 
+	next;
+    }
+
+### get alignment
+
+    if((/^Query:/ || /^Sbjct:/ || (/^\s+/ && $_ !~ /[a-z\d]/)) && ($_ !~ /Score/) && ($nohits{$query_ID} == 0))
+    { 
+	my $c = $counter -1;
+	my $a = $subject_ID ."**" . $query_ID . "**" . $c || die("$subject_ID ."**" . $query_ID . "**" . $c\n$_");
+
+	#==============================================================#
+        # Since this will loop through all the lines of the hsp	       #
+	# and I only want to collect the scores once,		       #
+	# I set bit=1 as soon as I get the score and only allow	       #
+	# loop if bit is 1. At the end of the 1st iteration	       #
+	# is 0 again so it will not continue.			       #
+        #==============================================================#
+	if ($bit == 1) 
+	{
+	    ## $info has all information for this HSP
+	    $info = "(" . "Length = " . $length . ")\n\n\n" .  $score_line . "," . $id ."\n" . $frame . "\n"  . "\n";
+	    push @infos, $info;
+	    die("counter : $counter\n") if $counter == 0;  ## $counter should never be 0 at this point.
+	    
+            #===================================================#
+            # last HSP's scores and clear list		        #
+	    # can access the scores by using 		        #
+	    # unique key : scores{sub**quer**hsp_number}        #
+            #===================================================#
+	    $scores{$a} = [@infos];  
+	    @infos = ();
+	    $bit = 0;
+	}
+	## Push current line => @hsps
+
+	push @hsps, $_;
+	push @hsps, "\n" if /^Sbjct:/;
+
+	$previous_mid_line = "";
+
+	
+    }
+
+    ## if we are at the end of the query's entry 
+    ## and we have had at least 1 hit
+    if((/Matrix/) && ($nohits{$query_ID} == 0)) 
+    {
+	## @algnments contains the list of lines of the last HSP (query, subject, middle)
+	push @algnments, [@hsps]; 
+	@hsps=();
+
+	## make $a => unique name for quer/sub : subject+query
+	my $a = $subject_ID . $query_ID;
+	$subjects{$a} = [@algnments];
+	&check_for_hits($a,"2");
+
+	
+
+
+	## %subjects contains all hsps 
+	## for specific query/sub pair
+
+	## make $a => unique name for specific hsp
+	## so scores{a} will give all info for this hsp
+	$a = $subject_ID ."**" . $query_ID . "**" . $c; 
+	$scores{$a} = [@infos] unless exists $scores{$a};
+
+	## empty alignments for next query
+	@algnments = ();
+
+	
+	#===================================================#
+        # If we have had at least one good 		    #
+	# alignment, with qmatch and smatch aligned.	    #
+	# See sub check_for_hits			    #
+        #===================================================#
+	if ($hit[0])
+	{
+	    #============================================#
+            # @hit is the list of names			 #
+	    # of those hsps of this sub/quer pair	 #
+	    # which hjad a hit				 #
+            #============================================#
+#	    $hits{$query_ID} = [@hit];
+	    if ($best){ &print_best_hit(@hit)}
+	 #   elsif($specific) {&print_specific_hits(@hit)}
+	    else {&print_hits(@hit) }
+	    ## Get ready for the next
+	    @hit = ();
+	    
+	}
+
+	## Else clear the hashes to save memorey usage
+	else
+	{
+	    %subjects = ();
+	    %scores =();
+	}
+	$subject_ID = "";
+    }
+}
+
+
+#my @ahit = keys(%hits);
+
+## number of sub/quer pairs with at least one hsp hit
+#my $hit_number = @ahit;
+
+## No hits : no good... lets die.
+if ($actual_hits == 0)
+{
+    print STDOUT "\nSorry 0 hits found!\n";
+    exit(1);
+	
+}
+
+
+if ($best && $verbose)
+{
+    if($specific)
+    {
+	my @a = keys(%wanted);
+	print STDERR "\n$actual_hits hits found, printed $specific_hits HSPs for query sequence(s) : @a\n" if $query_list;
+	print STDERR "\n$actual_hits hits found, printed $specific_hits HSPs for subject sequence(s) : @a\n" if $sbjct_list;
+	exit(1);
+    }
+
+    print STDERR "\n$actual_hits hits found, ";
+    print STDERR "$best_printed hits printed (printing best hit for each query)\n" if $single_best;
+    print STDERR "$best_printed hits printed (printing best hits for each query)\n" unless $single_best;
+    exit(1);
+}
+elsif($specific)
+{
+    my @a = keys(%wanted);
+    if($no_self)
+    {
+	print STDERR "\n$actual_hits total hits found. $skipped_hits self-hits ignored and $specific_hits HSPs printed for query sequences : @a\n" if $verbose && $query_list;
+    }
+    else
+    {
+	print STDERR "\n$actual_hits hits found, printed $specific_hits HSPs for query sequences : @a\n" if $verbose && $query_list;
+	print STDERR "\n$actual_hits hits found, printed $specific_hits HSPs for subject sequences : @a\n" if $verbose && $sbjct_list;
+    }
+    
+    exit(1);
+}
+elsif($verbose && $no_self)
+{
+    print STDERR "\n$actual_hits hits found, $skipped_hits self-hits ignored, " . ($actual_hits - $skipped_hits) . " HSPs printed \n" if $verbose;
+    exit(1);
+}
+else
+{
+    print STDERR "\n$actual_hits hits found\n" if $verbose;
+    exit(1);
+
+}
+
+
+
+############################################################################################
+################                        FUNCTIONS                         ##################
+############################################################################################
+
+#=====================================================================================================#
+# This is where it gets a little complicated... @ahit is the list of keys of %hits. 		      #
+# So, this is a list of query names. We iterate through this list				      #
+# using each query name to access the list of hits for that query. ( @{$hits{$query_key}}  ). 	      #
+# Then foreach of those we print what we want to print.					              #
+#=====================================================================================================#
+sub print_hits
+{
+ 
+
+
+    &debug("Printing hits...\n");
+    hit:foreach my $hit (@_)
+    {
+	## Split at ** to retrieve subject, query and number
+	my ($SUB, $QUERY, $NUM) = split /\*\*/, $hit;
+	
+        # print only desired hits
+	if($specific)
+	{
+	    my ($Q, $S) = ($QUERY, $SUB);
+	    if($query_list)	{ $Q = $1 if $Q =~ /^(.*?)\s/; next hit unless defined $wanted{$Q}; }
+	    if($sbjct_list)	{  $S =~ s/>//; $S = $1 if $S =~ /^(.*?)\s/;  next hit unless defined $wanted{$S};   }
+
+	}
+	
+	my $has_already_matched_another_of_the_selfs=0;
+	self:foreach my $self (@no_selfs)
+	{
+	    next self if $has_already_matched_another_of_the_selfs == 1;
+	    if ($SUB =~ /$self/i)
+	    {
+		$skipped_hits++;
+		$has_already_matched_another_of_the_selfs=1;
+		next hit;
+	    }
+	    
+	}
+	$specific_hits++;
+
+	#==========================================================#
+	# Print everything we need. Look at the comments for	   #
+	# each of the data structures above and below		   #
+	# to see what's going on				   #
+	#==========================================================#
+	print STDOUT "Query= $QUERY\n\t($letters letters)\n\n$SUB\n\t";
+	print STDOUT "@{$scores{$hit}}\n";
+	my $a = $SUB . $QUERY;
+	map{print STDOUT "$_"; } @{$subjects{$a}[$NUM]};
+	&gff_output(@{$subjects{$a}}[$NUM],@{$scores{$hit}},$QUERY,$SUB,$hit ) if $gff;
+	print STDOUT "\n######################################################\n\n";
+    }
+    ## Empty hashes to save memory usage
+    %subjects = ();
+    %scores =();
+    
+}
+
+
+
+## Print only the best hit (lowest eval) foreach query
+sub print_best_hit
+{
+    &debug("Printing best hits...\n");
+    my $evalue = 100;
+    my $lowest_evalue = 100;
+    my %best_hit;
+    my @best_hits;
+    my ($SUB, $QUERY, $NUM);
+    my ($best_SUB,$best_NUM);
+    hit:foreach my $hit (@_)
+    {  
+
+        ($SUB, $QUERY, $NUM) = split /\*\*/, $hit;
+	${$scores{$hit}}[0] =~ /Expect[^=]+=\s+(.*?),/ || die("Cannot match evalue <> $.\n");
+	$evalue = $1;
+	if ($1 =~ /^\s?e/)
+	{
+	    $evalue = "1" . $evalue;
+	}
+	
+	&debug("current evalue : $evalue lowest evalue : $lowest_evalue");
+	## Debugging stuff, never mind
+	if ($debug){$evalue < $lowest_evalue ? print STDERR "Smaller than smallest ? YES\n" : print STDERR "Smaller than smallest ? NO\n";}
+	if($evalue <= $lowest_evalue)
+	{
+	    push @best_hits, $hit;
+	    $lowest_evalue = $evalue;
+	}
+	    
+	else
+	{
+	    next;
+	}
+	
+	if($single_best)
+	    {
+		$best_hit{$QUERY} = $hit;
+		$best_SUB = $SUB;
+		$best_NUM = $NUM;
+	    }	
+    }
+    if($single_best)
+    {	
+#	$actual_hits++;
+	$best_printed++;
+	&print_hits($best_hit{$QUERY});
+# 	print STDOUT "Query= $QUERY\n\t($letters letters)\n\n$SUB\n\t";
+# 	print STDOUT "@{$scores{$best_hit{$QUERY}}}\n";
+ 	my $a = $best_SUB . $QUERY;
+# 	map{print STDOUT "$_"; } @{$subjects{$a}[$best_NUM]};
+ 	&gff_output(@{$subjects{$a}}[$best_NUM],@{$scores{$best_hit{$QUERY}}},$QUERY,$best_SUB,$best_hit{$QUERY} ) if $gff;
+# 	print STDOUT "\n######################################################\n\n";
+    }
+    else
+    {   
+	
+	&print_hits(@best_hits);
+    }
+}
+
+
+sub gff_output
+{
+    &debug("writing gff...");
+  
+    my @hsp = @{$_[0]};
+    my $l = @hsp;
+
+    $hsp[0] =~ /:\s(\d+)\s/ || die("No match for gff start, hsp line :\n$hsp[0]\n");
+    my $query_start = $1;
+
+    $hsp[$l-4] =~ /\s(\d+)\s?\n/;
+    my $query_end = $1;
+
+    my $QUERY = $_[2];
+    $QUERY =~ s/\s+//g;
+
+    my $SUBJECT = $_[3];
+    $SUBJECT =~ s/>//;
+    $SUBJECT = $1 if $SUBJECT =~ /^(.*?)\s/;
+
+    $hsp[2] =~ /:\s(\d+)\s?\w/ || die("No match for gff start, hsp line :\n$hsp[2]\n");
+    my $sbjct_start = $1;
+
+    $hsp[$l-2] =~ /\s(\d+)\s?\n/ || die("No match for gff end, hsp line :\n$hsp[$l-2]\n");
+    my $sbjct_end = $1;   
+
+    my $info = $_[1];
+    $info =~ /Frame\s+=\s+([-+])(\d+)/ || die("hoho : \n@$info\nargv : @_\n");
+    my $frame = $2;
+    my $strand   = $1;
+    my $score    = '1';
+    my $realname = '.';
+    my $hit = $_[4];
+
+
+    if($gff eq "s")
+    {
+	
+	## Remove gff file from previous instance if there
+	if ((-e "$QUERY.sbjcts.gff") && ($gff) && $first_run_of_sub_gff)
+	{
+	    print STDERR "$QUERY.sbjcts.gff exists from a previous instance, remove(y/n)?\n";
+	    my $apan = <STDIN>;
+	    chomp $apan;
+	    if($apan eq "y"){unlink("$QUERY.sbjcts.gff");}
+	    else{die("Please remove or rename $QUERY.sbjcts.gffto continue\n");}
+	}
+
+	open (GFF, ">>$QUERY.sbjcts.gff ") || die ("Cannot open $QUERY\.gff: $!");
+	print  GFF  "$SUBJECT\talignthingie\tHSP\t$sbjct_start\t$sbjct_end\t$score\t$strand\t$frame\tQuery \"$QUERY\"\t.\n" if $strand eq '+'; 
+	print  GFF "$SUBJECT\talignthingie\tHSP\t$sbjct_end\t$sbjct_start\t$score\t$strand\t$frame\tQuery \"$QUERY\"\t.\n" if $strand eq '-';
+	close (GFF);
+
+    }
+    elsif($gff eq "q")
+    {
+
+	if ((-r "$QUERY.gff") && ($gff) && $first_run_of_sub_gff)
+	{
+	    print STDERR "$QUERY.gff exists from a previous instance, remove(y/n)?\n";
+	    my $apan = <STDIN>;
+	    chomp $apan;
+	    if($apan eq "y"){unlink("$QUERY.gff");}
+	    else{die("Please remove or rename $QUERY.gff to continue\n");}
+	}
+	
+	open (GFF, ">>$QUERY.gff ") || die ("Cannot open $filename\.gff: $!");
+	print  GFF  "$QUERY\talignthingie\tHSP\t$query_start\t$query_end\t$score\t$strand\t$frame\tTarget \"$SUBJECT\"\t.\n" if $strand eq '+'; 
+	print  GFF "$QUERY\talignthingie\tHSP\t$query_end\t$query_start\t$score\t$strand\t$frame\tTarget \"$SUBJECT\"\t.\n" if $strand eq '-';
+	close (GFF);
+    }
+   
+     $first_run_of_sub_gff = undef;
+}
+
+
+
+
+sub check_for_hits
+{
+    
+    my $key = $_[0];
+    my $temp = $_[1];
+    &debug("xxxxxxxxxxxxxxxxxxxxxx checking hits $temp xxxxxxxxxxxxxxxxxxxxxx");
+    my $c = $counter -1;
+        
+    my $insignificant_counter = 0;
+    my $number = @{$subjects{$key}};
+    
+    for (my $i=0; $i<$number;$i++)
+    {
+	
+array:	foreach my $array (@{$subjects{$key}}[$i] )
+	{
+	    my $ba = $subject_ID ."**" . $query_ID . "**" . $i;
+	    &debug("\$a : $ba");
+#	  print STDERR "rarray : @{$array}\n";
+	    my $array_counter = 0;
+	    foreach my $hsp_line (@{$array})
+	    {
+		$array_counter++;
+		next if $hsp_line =~ /^\s+$/;
+		if ($hsp_line =~ /^Query:/) {    &check_query($hsp_line,$array); }
+		elsif ($hsp_line =~ /^\s/)  {  &check_middle($hsp_line,$array,$ba);  }
+		else { &check_subj($hsp_line,$array,$array_counter,$ba);  }		
+		if($gotahit)
+		{
+		    ## Count the hits
+		    $actual_hits++;
+		    my $a = $subject_ID ."**" . $query_ID . "**" . $i;
+		    $hit_lines{$a} = $hsp_line;
+#		    print STDERR "***************************Gotahit!! for $a\n";
+		    push @hit, $a ;#unless $insignificant_counter >0; 
+		    $insignificant_counter++;
+		    $gotahit = 0;
+		    next array;
+		}
+	    }
+	}
+	&debug("--------------- Checked for hits... --------------- ");
+	
+    }
+}
+
+########################################################################################
+########################################################################################
+
+sub check_query
+{
+    &debug("Checking query..."); 
+
+    @q_matches = (); 
+    my @array = @{$_[1]};
+    ## Am only interested in the aa/nt part of the line
+    $_[0] =~ /:\s+\d+\s+(.*?)\s\d/;
+    my $line = $1 or die("cannot match pattern : $_\n") ;
+    ## used later on to get the right bit of the middle line
+    $hsp_start = index($_[0], $line) ;
+    $hsp_end = length($line);
+    ## will remain -1 if no hits
+    $q_match = -1;
+    #=======================================================#
+    # go through query line looking for $QMATCH    	    #
+    # and push all matchihng positions to @q_matches	    #
+    #=======================================================#
+    while($line =~ /$QMATCH/ig)  
+    {
+	$q_match =  pos($line);
+	push @q_matches, $q_match;
+     
+    }
+    &debug("Checked query.\n");
+}
+
+########################################################################################
+########################################################################################
+
+sub check_subj
+{ 
+    &debug("Checking subject...");
+    my $s_match;
+    my @array = @{$_[1]};
+    my $array_counter = $_[2];
+    my $a = $_[3];
+    ## Am only interested in the aa/nt part of the line
+    $_[0] =~ /\d+\s*?([^\s]*)\s\d/ || die("cannot match line $. :  $_[0]\n");
+    my $line = $1;
+           
+    ## If we found QMATCH, see what it alignes to
+    if (($q_match != -1) && ($gotahit == 0))  ## do it only once
+    { 
+      Q: foreach my $q (@q_matches)
+      {
+	  &debug("q : $q");
+	  next Q if $gotahit;
+	  ## Get position aligned to matching position in query line
+	  ## Use qlength to allow for longer patterns
+	  $s_match =  substr($line, $q-$qlength, $qlength) || die ("match problem\nline : $line\nq : $q\nqmatches : @q_matches\n");
+	  if ($s_match eq $SMATCH)
+	  {
+	      
+	      if ($chck_cons == 0)
+	      {
+		  &check_cons();
+		  next Q;
+	      }
+	      else
+	      {
+		
+		  #=================================================================================#
+		  # These are the regions where we want to check for conservation :	            #
+		  # Immediately to the left and right of QMATCH and then in the surrounding area    #
+		  #=================================================================================#
+		  my ($left, $right, $region);
+		  
+		  #=========================================================================#
+		  # If the target QMATCH is too close to the beginning of the HSP's	    #
+		  # line, the left region to be checked for conservation will be too	    #
+		  # short, so we need to concatenate the region from the preceeding 	    #
+		  # line and then check the whole thing for conservation		    #
+		  #                                                                         #
+		  # The curent line is $array[$array_counter-1]                             #
+		  #=========================================================================#
+		  if ($q <=$SECAROUND )
+		  {  
+		      
+		      #===============================================================================#
+		      # If there isn't a previous middle line in the array, and			  #
+		      # by extension no more conservation, goto next match 			          #
+		      # (unless we are not checking conservation, in which case this is a hit)	  #
+		      #===============================================================================#
+		      
+		      if ($array_counter-6 <0)
+		      {  
+			  next Q if $chck_cons;
+		      }
+		      ## Else if there is...
+		      else
+		      {
+			  $previous_mid_line = $array[$array_counter-6];
+			  my $temp = substr($middle_line, 0, $q-1);
+			  my $len  = $SECAROUND-$q;
+			  $left = substr($previous_mid_line, -$len) . $temp;
+			  
+		      }
+		  }
+		  else
+		  {
+		      $left= substr($middle_line,$q-$SECAROUND-1,$SECAROUND );
+		      
+		  }
+		  $right = substr($middle_line, $q,$SECAROUND) || substr($middle_line, $q);
+		  my $left_cons = 0;
+		  my $right_cons = 0;
+		  my $region_cons = 0;
+		  
+		  #=========================================================================#
+		  # If the target QMATCH is too close to the end of the HSP's line	        #
+		  # the right  region to be checked for conservation will be too short      #
+		  # so we need to concatenate the region from the following line and 	#
+		  # then check the whole thing for conservation			        #
+		  #=========================================================================#
+		  
+		  if (length($right) < $SECAROUND)
+		  {
+		      my $temp_line;
+		      if ($array[$array_counter+1])
+		      {
+			  #=============================================================#
+			  # Sometimes the blast output has 2 \n and sometimes 3.        #
+			  # This step is to get the right line			    #
+			  #=============================================================#
+			  if (($array[$array_counter+1]) && ($array[$array_counter+1] =~ /Query/))
+			  {
+			      #==================================================================================#
+			      # But what if, as has happened, the middle line is itself completely empty?	     #
+			      # In that case the line following "query" will be "sbjct". This also	             #
+			      # means that there is no conservation so we can go to next Q. Very special 	     #
+			      # case but worth dealing with   						     #
+			      #==================================================================================#
+			      if($array[$array_counter+2] =~ /Sbjct/ )
+			      {
+				  
+				  next Q;
+			      }
+			      else
+			      {
+				  $temp_line = $array[$array_counter +2];
+			      }
+			  } 
+			  elsif (($array[$array_counter+2]) && ($array[$array_counter+2] =~ /Query/))
+			  {
+			      $temp_line = $array[$array_counter +3];
+			  }
+			  ## If this is the end of the HSP, next...
+			  else
+			  {
+			      next Q;
+			  }
+		      }
+		      else
+		      {
+			  next Q;
+		      }
+		      
+		      #====================================================#
+		      # We now have the right line, so extract the         #
+		      # relevant regions and check for conservation	       #
+		      #====================================================#
+		      
+		      $temp_line =~ /^\s+(.*)/ || die("could not match line $. : $temp_line\n");
+		      $temp_line = $1;
+		      my $temp_hsp_start = index($array[$array_counter +2], $temp_line);
+		      my $temp_hsp_end = length($temp_line);
+		      my $new_line = $right . substr($array[$array_counter +2], $temp_hsp_start, $temp_hsp_end);
+		      my $aline = substr($array[$array_counter +2], $temp_hsp_start, $temp_hsp_end);
+		      $right = $new_line;
+		      $region = $left . $right;
+		      &debug("l : $left\nr : $right\nregion : $region"); 
+		      while($left =~ /[A-Z\+]/g){$left_cons++}
+		      while($right =~ /[A-Z\+]/g){$right_cons++}
+		      while($region =~ /[A-Z\+]/g){$region_cons++}
+		  }
+		  else
+		  {
+		      $region = $left . $right;
+		      &debug("l : $left\nr : $right\nregion : -$region-"); 
+		      while($left =~ /[^\s]/g){$left_cons++}
+		      while($right =~ /[^\s]/g){$right_cons++}
+		      while($region =~ /[^\s]/g){$region_cons++}
+		  }
+		  
+		  
+		  $previous_line = $line;
+		  
+		  &check_cons($left_cons,$right_cons, $region_cons,$a);
+		  
+	      }
+	  }
+	  ## If $s_match is not equal to $SMATCH
+	  else
+	  {
+	      next Q;
+	  }
+      }
+    }
+    
+}
+
+
+########################################################################################
+########################################################################################
+# &check_middle($hsp_line,$array,$ba)
+sub check_middle
+{
+    &debug("Checking middle...");
+    $middle_line = substr($_[0], $hsp_start, $hsp_end);
+}
+
+########################################################################################
+########################################################################################
+
+sub check_cons
+{
+
+    if ($chck_cons == 1)
+    {
+	&debug("Checking conservation...");
+	my ($left_cons,$right_cons,$region_cons, $a) = @_;
+	${$scores{$a}}[0] =~ /Expect[^=]+=\s+(.*?),/ || die("Cannot match evalue <> $.\n");
+	my $evalue = $1;
+	if ($evalue =~ /^\s?e/)
+	{
+	    $evalue = "1" . $evalue;
+	}
+	${$scores{$a}}[0] =~ /Score\s=\s+(.*?)\s/;
+	my $score =$1;
+	${$scores{$a}}[0] =~ /Identities\s:\s+(.*?)%/;
+	my $idval = $1;
+	
+	my @temp_array = ($left_cons,$right_cons,$region_cons, $score, $idval);
+	foreach my $number (@temp_array)
+	{	    die("*** PROBLEM : left : $left_cons right : $right_cons region : score :  $score $number is not a valid value, must use a number\ntry 'alignthingie.pl -h' for more information\n")  unless $number =~ /^[\d\.]+$/;
+	}
+
+	&debug("eval : $evalue, id : $IDMAX >= $idval >= $IDENTITY, score : $score\nlft cons : $left_cons >= $CONS_LEFT, rght cons : $right_cons >= $CONS_RIGHT");
+	&debug("reg cons  : $region_cons >= $CONS_ALL\nline $_");
+	if ( ($left_cons >= $CONS_LEFT )  && ($right_cons >= $CONS_RIGHT) && ($region_cons >= $CONS_ALL) && ($score >= $SCOREMIN) && ($score <= $SCOREMAX ) && ($evalue <= $EVALUE ) && ($idval >= $IDENTITY) && ($idval <= $IDMAX) ) 
+	{
+	    $gotahit++;
+	}
+#	else {die("id : $idval, $evalue,$score, $a ")}
+    }
+    else
+    {
+	&debug("Not checking conservation...");
+	$gotahit++ if ($score >= $SCOREMIN) && ($score <= $SCOREMAX ) && ($evalue <= $EVALUE ) && ($idval >= $IDENTITY) && ($idval <= $IDMAX);
+    }
+   
+     &debug("...and got a hit!") if $gotahit;
+} 
+
+########################################################################################
+########################################################################################
+
+sub usage
+{   
+    open(HELP, "| more") ;
+    print HELP <<EndOfHelp;
+PROGRAM: 
+        alignthingie.pl
+
+USAGE:  
+	alignthingie.pl [options] blast.out 
+
+alignthingie will parse a blast outfile and return those HSPs
+where a specific residue in the query line is found aligned to
+another (or the same) specific residue in the subject line if
+that hsp meets certain evalue, identity, score and conservation 
+criteria.
+
+COMMAND-LINE OPTIONS:
+
+    -c : Minimum number of conserved residues (or '+') allowed around the matched residue (integer, def : 6)
+    -e : Maximum e-value allowed (integer, def : 1)
+    -i : Minimum (i)dentity percentage allowed (integer, def : 0)
+    -I : Maximum (I)dentity percentage allowed (integer, def : 100)
+    -l : Minimum number of conserved residues (or '+') allowed on the (l)eft side of the matched residue
+         (def : 3)
+    -r : Minimum number of conserved residues (or '+') allowed on the (r)ight side of the matched residue
+         (def : 3)	 
+    -M : (M)aximum score value allowed (integer, def : 10000)
+    -m : (m)inimum score value allowed (integer, def : 0)
+    -q : String to match in query (def : '\*' )
+    -s : String to match in subject     (def : '\*')
+    -R : Length of (R)egion around matched residue to check for conservation (integer, def : 6)
+         (R-matched residue-R)	 
+    -S : Use strict evalue, id, score (0.01,65,50 respectively) and conservation cuttoffs.
+         Writing the cons cuttoffs too long, just run "alignthingie.pl -Sd" to see...
+    -k : Do not check conservation
+
+OUTPUT OPTIONS:
+    -b :  Print only the (b)est (lowest e-value) hit for each query. If the smallest evalue
+          is shared by more than one HSP, all such HSPs will be printed.
+    -B :  Print only the (B)est (lowest e-value) hit for each query. If the smallest evalue
+          is shared by more than one HSP, only the first such HSP will be printed.
+    -d : (d)ebugging mode, very very verbose...
+    -f :  No sel(f) : Skips subjects whose name matches (case-INsensitive) the value passed. (string)
+    -g : (g)ff output. Use "-g q" for guery position gff and "-g sm" for subject gff.
+    -Q : (Q)uery name or list of names (text file, one name per line) to return HSPs for. Only those HSPs whose 
+          query is specified will be printed
+    -T : (T)arget (subject) name or list of names (text file, one name per line) to return HSPs for. 
+          Only those HSPs whose subject is specified will be printed
+    -v : (v)erbose output
+
+EndOfHelp
+close(HELP);
+    exit(1);
+
+}
+
+########################################################################################
+########################################################################################
+
+
+sub debug
+{
+    if ($debug)
+    {
+	print STDERR "@_\n";
+    }
+}
+
+#############################################---TODO---########################################
+### 1) Try and get some kind of a scoring scheme, eg look for CXX*
+### 2) Integrate into genome pipeline
+### 3) Play with best/spec etc output, look at combinations and if we get the numbers printed right
+#############################################---BUGS---########################################
+

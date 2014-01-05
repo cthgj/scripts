@@ -1,0 +1,90 @@
+#!/bin/bash
+## cands, nc
+# declare -a dirs=(betweeness  degree  disopred domains length shortest_paths classes isoforms);
+# declare -a titles=(Betweeness Degree Disorder Domains Length Shortest_Paths Classes Isoforms)
+# declare -a exts=(betnums degnums perc domnums lennums paths clascount count)
+ declare -a dirs=(betweeness  degree  disorder  domains  length  classes);
+# declare -a titles=(Betweeness Degree Disorder Domains Length Classes)
+ declare -A titles;
+titles[betweeness]="Betweeness"
+titles[degree]="Degree"
+titles[disopred]="Disorder"
+titles[domains]="Domains"
+titles[length]="Length"
+titles[classes]="Classes"
+titles[shortest_paths]="Shortest_Paths"
+
+
+declare -A dirnames;
+dirnames[betweeness]="betweeness"
+dirnames[degree]="degree"
+dirnames[disopred]="disopred"
+dirnames[domains]="domains"
+dirnames[length]="length"
+dirnames[classes]="classes"
+dirnames[shortest_paths]="paths"
+
+declare -A exts;
+exts[betweeness]="betnums"
+exts[degree]="degnums"
+exts[disopred]="perc"
+exts[domains]="domnums"
+exts[length]="lennums"
+exts[classes]="clascount"
+exts[shortest_paths]="count"
+
+species=$1;
+mode=$2;
+declare -a files=($species.$mode.cands $species.hub $species.$mode.multi_noncands $species.multi $species.$mode.non $species.mono $species $species.$mode)
+
+#echo ${Unix[@]:3:2}
+aa=(${@});
+## If more than 2 arguments are given, take the rest as dir names
+if (( $# > 2 )); then
+    dirs=${aa[@]:2:$#}
+fi
+
+echo "Building boxplots for $species $mode" 1>&2
+for  (( i=0; i<=$(( ${#dirs[*]} -1 )); i++ ))
+do
+    name=${dirs[$i]}
+    echo "-------------------- $name  $species $mode ----------------------------";
+    cd $name;
+    com="make_Rs.pl -m $mode -t \"${titles[$i]}\" ";
+    echo "$com";
+    for f in ${files[@]}
+    do
+#	com+="$name/$species.$mode.${exts[$i]} "; 
+	com+=" $f.${exts[$i]}"
+    done
+    com+=".box.png"
+    echo "$com";
+   # $com > $species.$mode.box.R && Rscript $species.$mode.box.R
+    cd - >/dev/null
+
+done
+
+echo "Building density plots for $species $mode" 1>&2
+for  (( i=0; i<=$(( ${#dirs[*]} -1 )); i++ ))
+do
+    cd $name;
+    com="make_Rs.pl -m $mode -dt \"${titles[$i]}\" ";
+    for f in ${files[@]}
+    do
+#	com+="$name/$species.$mode.${exts[$i]} "; 
+	com+=" $f.${exts[$i]}"
+    done
+    com+=".distr.png"
+    echo $com;
+    #$com > $species.$mode.distr.R && Rscript $species.$mode.distr.R
+    cd - >/dev/null
+done
+
+### Special case for the phosphorylation data
+echo "-------------------- Phospho $species $mode ----------------------------";
+cd phospho
+echo "cd phospho; make_Rs.pl -m $mode -pt \"Phosphorylation\"  $species.$mode.cands.ph $species.hub.ph $species.$mode.multi_noncands.ph $species.multi.ph $species.$mode.non.ph $species.mono.ph $species.all.stats ";
+ 
+#make_Rs.pl -m $mode -pt "Phosphorylation" $species.$mode.cands.ph $species.hub.ph $species.$mode.multi_noncands.ph $species.multi.ph $species.$mode.non.ph $species.mono.ph $species.all.stats  > $species.$mode.R; Rscript $species.$mode.R; 
+
+cd -
