@@ -5,7 +5,7 @@ use Getopt::Std;
 my %opts;
 getopts('a:n:g:',\%opts) || do { print "Invalid option\n"; exit(1); };
 my $genealogy_file=$opts{g} || die("Need a genealogy file, -g (eg ~/research/GO/all_three_Feb11-2013.genealogy: $!\n");
-my $alt_file=$opts{a}||"/home/cchapple/research/GO/GO.terms_alt_ids";
+my $alt_file=$opts{a}||"/home/terdon/research/GO/GO.terms_alt_ids";
 
 my %obs;
 open(ALT,"$alt_file")||die("Could not open $alt_file: $!\n");

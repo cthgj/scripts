@@ -40,4 +40,4 @@ while(<>){
     $h{$fields[8]}++;
 }
 map{print "\$alignr $h{$_} $_\n"}keys(%h);
-#$alignr${execi 10 /home/cchapple/scripts/java_to_azureus.pl ~/netstat  | cut -d: -f1 | cut -d\/ -f2 | sort | uniq -c | sort -nr}
+#$alignr${execi 10 /home/terdon/scripts/java_to_azureus.pl ~/netstat  | cut -d: -f1 | cut -d\/ -f2 | sort | uniq -c | sort -nr}

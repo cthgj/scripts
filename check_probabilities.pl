@@ -7,7 +7,7 @@ use Getopt::Std;
 
 my %opts;
 getopts('hvo:g:',\%opts) ;
-my $geneology_file=$opts{g}||"/home/cchapple/research/GO/biological_process.geneology";
+my $geneology_file=$opts{g}||"/home/terdon/research/GO/biological_process.geneology";
 my %prob;
 my $verbose=$opts{v}||undef;
 

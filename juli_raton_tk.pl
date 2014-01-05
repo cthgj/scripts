@@ -4,11 +4,11 @@ use Tk;
 #use Tk::Carp qw/cluck/;
 use Tk::ErrorDialog;
 my %l; 
-my $icon_file="/home/cchapple/mouse.gif";
+my $icon_file="/home/terdon/mouse.gif";
 $mw = MainWindow->new; 
 $mw->geometry("650x70+300+380");
 $mw->title("Juli Raton!");
-my $icon = $mw->Photo(-file => '/home/cchapple/mouse.gif');
+my $icon = $mw->Photo(-file => '/home/terdon/mouse.gif');
 $mw->iconimage($icon);
 my $dir='bob'; 
 $mw->Label(-text=>"Use the button below to chose the directory containing the files you want to analyze",

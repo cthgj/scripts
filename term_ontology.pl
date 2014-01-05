@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
-my $termfile="/home/cchapple/research/GO/GO.terms_alt_ids";
+my $termfile="/home/terdon/research/GO/GO.terms_alt_ids";
 unless (-e $termfile){
     $termfile="/cobelix/chapple/backup/research/GO/GO.terms_alt_ids";
 }

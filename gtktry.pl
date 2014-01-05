@@ -10,12 +10,12 @@ $window->set_border_width(5);
 $window->set_position('center_always');
 $window->set_title (my $title='Juli Raton!');
 my $label_feedback;
-my $image=Gtk2::Image->new_from_file("/home/cchapple/mouse.gif");
+my $image=Gtk2::Image->new_from_file("/home/terdon/mouse.gif");
 
 #add and show the vbox
 
 
-$window->set_icon_from_file ("/home/cchapple/mouse.gif"); 
+$window->set_icon_from_file ("/home/terdon/mouse.gif"); 
 $window->add(&ret_vbox);
 
 $window->show();

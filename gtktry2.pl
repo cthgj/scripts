@@ -11,7 +11,7 @@ $window->set_position('center_always');
 $window->set_title (my $title='Juli Raton!');
 my $label_feedback;
 #add and show the vbox
-$window->set_icon_from_file ("/home/cchapple/mouse.gif"); 
+$window->set_icon_from_file ("/home/terdon/mouse.gif"); 
 $window->add(&ret_vbox);
 $window->show();
 
@@ -43,7 +43,7 @@ sub ret_vbox {
     my $run_button=Gtk2::Button->new('Run');
     $run_button->signal_connect('clicked' => sub{&run_juli_raton($filename)}, 'Run');
 # this calls our box creating function
-   # my $box = xpm_label_box("/home/cchapple/mouse.xpm", 'Select Folder');
+   # my $box = xpm_label_box("/home/terdon/mouse.xpm", 'Select Folder');
 
 # pack and show all our widgets
    # $box->show();

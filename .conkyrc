@@ -28,20 +28,20 @@
     override_utf8_locale yes
     use_spacer right
     text_buffer_size 556
-    lua_load /home/cchapple/scripts/draw_bg.lua
+    lua_load /home/terdon/scripts/draw_bg.lua
     lua_draw_hook_pre draw_bg
 
     TEXT
 
     ${font}${color Tan2}${font Poky:size=12}S$font ${font Arial:bold:size=8}SYSTEM ${color #5F1E00}${hr 2}$font${color white}
-       ${voffset -16}${offset 103}${execpi 300 /home/cchapple/scripts/conkyEmail.sh }
+       ${voffset -16}${offset 103}${execpi 300 /home/terdon/scripts/conkyEmail.sh }
        
        Hostname:$alignr${nodename}
        System:$alignr ${exec grep DISTRIB_DESCRIPTION /etc/lsb-release | perl -ne '/\"(.*?)\"/; print "$1\n"'}
        Kernel: $alignr${kernel}
        CPU:$alignr${execi 99999 cat /proc/cpuinfo | grep "model name" -m1 | cut -d":" -f2 | cut -d" " -f2- | perl -ne 's/\(.+?\)//g; s/CPU//; s/\s+/ /g; s/\s$//; print'}
        Uptime $alignr${uptime}
-       Battery:$alignr ${execi 2 /home/cchapple/scripts/battery_status.pl}
+       Battery:$alignr ${execi 2 /home/terdon/scripts/battery_status.pl}
        Temperature: $alignr ${execpi 2 ~/scripts/conkytemp.pl}
        Fan Speed:$alignr${execpi 2 ~/scripts/conkyFan.pl}
     ${voffset -2}${color Tan2}${font Poky:size=12}M${font Arial:bold:size=8}${offset 4}CPU/RAM${color #5F1E00}${hr 2}   $font${color }	       
@@ -96,10 +96,10 @@ ${voffset 10}${execi 3600 perl ~/scripts/weather.pl mar c 5dt}
 ${offset 0}${color white}${execi 3 dmesg |tail -n10 | perl -e 'my @a; my $s="      "; while(<>){/.*?\]\s*(.+)$/; push @a,$1;} for($n=scalar(@a)-1;$n>=0; $n--){$_=$a[$n]; $l=length; $k=0; while($k<$l){ $k!=0 ? print "$s  " : print "$s";print substr($_,$k,45) . "\n";   $k+=45; }}'}
 
 
-${image /home/cchapple/conkyimages/image1.gif -p 19,525}
-${image /home/cchapple/conkyimages/image2.gif -p 54,525}
-${image /home/cchapple/conkyimages/image3.gif -p 95,525}
-${image /home/cchapple/conkyimages/image4.gif -p 132,525}   
-${image /home/cchapple/conkyimages/image5.gif -p 170,525}
-${image /home/cchapple/conkyimages/current.gif -p 173,455 -s 128x92}
+${image /home/terdon/conkyimages/image1.gif -p 19,525}
+${image /home/terdon/conkyimages/image2.gif -p 54,525}
+${image /home/terdon/conkyimages/image3.gif -p 95,525}
+${image /home/terdon/conkyimages/image4.gif -p 132,525}   
+${image /home/terdon/conkyimages/image5.gif -p 170,525}
+${image /home/terdon/conkyimages/current.gif -p 173,455 -s 128x92}
  

@@ -6,7 +6,7 @@ my %opts;
 getopts('s:f:',\%opts);
 my $synfile=$opts{s};
 my $flat=$opts{f};
-my $go_terms_file='/home/cchapple/research/testing/new/data/GO.terms_alt_ids';
+my $go_terms_file='/home/terdon/research/testing/new/data/GO.terms_alt_ids';
 my %synonyms;
 $synonyms{LOADED}=0;
 my @names;

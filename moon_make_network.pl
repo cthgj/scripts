@@ -5,7 +5,7 @@ use Getopt::Std;
 
 my (%opts);
 getopts('MvTgncnhSl:s:N:w:f:C:m:p:r:R:',\%opts);
-my $DATADIR=$opts{D}||"/home/cchapple/research/testing/new/data";
+my $DATADIR=$opts{D}||"/home/terdon/research/testing/new/data";
 my $net_file=$opts{N}||"$DATADIR/../HSHQ.gr";
 my $cand=$ARGV[0];
 
@@ -127,7 +127,7 @@ sub make_networks{
 # 	open(C3,">$cyto_script")||die "Could not open $cyto_script:$!\n";
 # 	my $cur_dir=`pwd`;
 # 	chomp($cur_dir);
-# 	print C3 "session open file=\"/home/cchapple/research/testing/new/results/candidates.cys\"\n";
+# 	print C3 "session open file=\"/home/terdon/research/testing/new/results/candidates.cys\"\n";
 # 	print C3 "network import file=\"$cur_dir/$subnet_file\"\n";
 # 	print C3 "node import attributes file=\"$cur_dir/$attr_file\"\n";
 # 	print C3 "node import attributes file=\"$cur_dir/$attr_file1\"\n";

@@ -13,7 +13,7 @@ echo "STARTING : $(date)" 1>&2
 
 function usage () {
     me=`basename $0`;
-    echo -e "USAGE:\n\t$me destination source \n\n\tSource can be any directory or file.\n\tDestination can either be a local directory, or a remote location in the following format:\n\n\t\tusername@server:/destination/\ne.g.\n\t$me cchapple@10.1.1.54:/ptitbbackup/cchapple/backup/ /home/cchapple/research/ \n\n\tIf source is ommitted, ~/research is assumed, if destination is omitted then either\n\tpetitbonum or badabing is chosen depending on my IP address\n"
+    echo -e "USAGE:\n\t$me destination source \n\n\tSource can be any directory or file.\n\tDestination can either be a local directory, or a remote location in the following format:\n\n\t\tusername@server:/destination/\ne.g.\n\t$me cchapple@10.1.1.54:/ptitbbackup/cchapple/backup/ /home/terdon/research/ \n\n\tIf source is ommitted, ~/research is assumed, if destination is omitted then either\n\tpetitbonum or badabing is chosen depending on my IP address\n"
 
 echo "EXAMPLES:"
 echo -e "backup.sh                 : will backup $HOME/research to badabing or petitbonum depending on ip"

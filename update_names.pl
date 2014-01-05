@@ -2,8 +2,8 @@
 
 use strict;
 
-my $sec_ac="/home/cchapple/research/data/sec_ac.txt";
-my $acindex="/home/cchapple/research/data/acindex.txt";
+my $sec_ac="/home/terdon/research/data/sec_ac.txt";
+my $acindex="/home/terdon/research/data/acindex.txt";
 
 my (%accs,%ids,%names);
 

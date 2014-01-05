@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/cchapple
+cd /home/terdon
 setxkbmap -option grp:switch,grp:alt_shift_toggle us,es,gr
 gnome-do &
 start_conky.sh ~/.conkyrc&

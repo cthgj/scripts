@@ -99,7 +99,7 @@ sub terms_to_GOs{
 #    unless($term eq 'biological_process'){die("crapiola : -$term-\n");}
     $term=~s/_/ /g;
     if($have_already_read_terms_file==0){
-	open(T,"/home/cchapple/research/GO/GO.terms_alt_ids.txt")|| die("Cannot open terms file : $!\n");
+	open(T,"/home/terdon/research/GO/GO.terms_alt_ids.txt")|| die("Cannot open terms file : $!\n");
 	while(my $line=<T>){
 	    next if $line=~/^\!/; 
 	    chomp($line);

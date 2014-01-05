@@ -300,23 +300,23 @@ sub cond_symb { #translates conditions into symbol in weather font
     # elsif(/Scattered\sShowers/){$_="g"}
     # elsif ($_ =~ /Rain/ || /Drizzle/){$_="i";}
     # elsif ($_ =~ /Shower/){$_="h"; }
-    if ($_ =~ "Partly Cloudy"){$_="/home/cchapple/conkyimages/partly_cloudy.gif";}
-     elsif ($_ =~ /Wind/ ){$_="/home/cchapple/conkyimages/wind.gif";}
-    elsif($_ =~ /Mostly\sSunny/ || $_ =~ /Mostly\sClear/ ){$_="/home/cchapple/conkyimages/mostly_sunny.gif"}
-    elsif ($_ =~ /Mostly\sCloudy/){$_="/home/cchapple/conkyimages/cloudy.gif";}
-    elsif ($_ =~ "Cloud" || $_ =~ "Fog"){$_="/home/cchapple/conkyimages/cloudy.gif";}
-    elsif ($_ =~ "Storm" || $_ =~ "Thunder" || $_ =~ "T-"){$_="/home/cchapple/conkyimages/storm.gif";}
-    elsif ($_ =~ "Snow" || $_ =~ "Flurries" || $_ =~ "Wintry"){$_="/home/cchapple/conkyimages/snow.gif";}
+    if ($_ =~ "Partly Cloudy"){$_="/home/terdon/conkyimages/partly_cloudy.gif";}
+     elsif ($_ =~ /Wind/ ){$_="/home/terdon/conkyimages/wind.gif";}
+    elsif($_ =~ /Mostly\sSunny/ || $_ =~ /Mostly\sClear/ ){$_="/home/terdon/conkyimages/mostly_sunny.gif"}
+    elsif ($_ =~ /Mostly\sCloudy/){$_="/home/terdon/conkyimages/cloudy.gif";}
+    elsif ($_ =~ "Cloud" || $_ =~ "Fog"){$_="/home/terdon/conkyimages/cloudy.gif";}
+    elsif ($_ =~ "Storm" || $_ =~ "Thunder" || $_ =~ "T-"){$_="/home/terdon/conkyimages/storm.gif";}
+    elsif ($_ =~ "Snow" || $_ =~ "Flurries" || $_ =~ "Wintry"){$_="/home/terdon/conkyimages/snow.gif";}
     #elsif(/Shower/ && /Wind/){$_="f"}
-    elsif ($_ =~ "Fair"  || $_ =~ "Sunny"|| $_ =~ "Sun" || $_ =~ "Clear"){$_="/home/cchapple/conkyimages/sunny.gif";}
-    elsif(/Scattered\sShowers/){$_="/home/cchapple/conkyimages/showers.gif"}
-    elsif ($_ =~ /Rain/ || /Drizzle/){$_="/home/cchapple/conkyimages/rain.gif";}
-    elsif ($_ =~ /Shower/){$_="/home/cchapple/conkyimages/shower.gif"; }
+    elsif ($_ =~ "Fair"  || $_ =~ "Sunny"|| $_ =~ "Sun" || $_ =~ "Clear"){$_="/home/terdon/conkyimages/sunny.gif";}
+    elsif(/Scattered\sShowers/){$_="/home/terdon/conkyimages/showers.gif"}
+    elsif ($_ =~ /Rain/ || /Drizzle/){$_="/home/terdon/conkyimages/rain.gif";}
+    elsif ($_ =~ /Shower/){$_="/home/terdon/conkyimages/shower.gif"; }
     $ctext.="\${image " . $_ . " -p $offset,755}\n";
     $imgname="image" . $offset . ".gif";
     $offset++;
-    system("rm /home/cchapple/conkyimages/$imgname; ln -s $_ /home/cchapple/conkyimages/$imgname");
-    print STDERR "rm /home/cchapple/conkyimages/$imgname; ln -s $_ /home/cchapple/conkyimages/$imgname\n";
+    system("rm /home/terdon/conkyimages/$imgname; ln -s $_ /home/terdon/conkyimages/$imgname");
+    print STDERR "rm /home/terdon/conkyimages/$imgname; ln -s $_ /home/terdon/conkyimages/$imgname\n";
 }
 
 sub day_space { #Adds spaces for aligment

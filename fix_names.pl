@@ -9,9 +9,9 @@ getopts('chv', \%opts);
 my $verbose=$opts{v}||undef;
 my $flat=$opts{f}||undef;
 my $color=$opts{c}||undef;
-my $sec_ac="/home/cchapple/research/data/sec_ac.txt";
-my $acindex="/home/cchapple/research/data/acindex.txt";
-my $del="/home/cchapple/research/data/deleted";
+my $sec_ac="/home/terdon/research/data/sec_ac.txt";
+my $acindex="/home/terdon/research/data/acindex.txt";
+my $del="/home/terdon/research/data/deleted";
 my $id;
 my (%primary_accs,%del,%name,%accs,%ids,%names,%acc);
 

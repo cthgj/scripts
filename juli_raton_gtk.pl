@@ -12,10 +12,10 @@ $window->set_title (my $title='Juli Raton!');
 my $label_feedback;
 
 #add and show the vbox
-open(AA,">/home/cchapple/hahahaha");
+open(AA,">/home/terdon/hahahaha");
 print AA "WUWUWUWUWUWUW\n";
 
-$window->set_icon_from_file ("/home/cchapple/mouse.gif"); 
+$window->set_icon_from_file ("/home/terdon/mouse.gif"); 
 $window->add(&ret_vbox);
 $window->show();
 
@@ -26,7 +26,7 @@ sub ret_vbox {
     
     my $vbox = Gtk2::VBox->new(FALSE,5);
     	$label_feedback = Gtk2::Label->new();
-	my $image=Gtk2::Image->new_from_file("/home/cchapple/mouse_tr.gif");
+	my $image=Gtk2::Image->new_from_file("/home/terdon/mouse_tr.gif");
     $vbox->pack_start($image,FALSE,FALSE,6);
 
     #***************************************

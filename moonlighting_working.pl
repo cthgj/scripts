@@ -13,7 +13,7 @@ my $annotation_file_type;
 my $gaf_annotations_file=$opts{f} || "gene_association.goa_human";
 &usage() if $opts{h};
 
-my $stats_dir="/home/cchapple/research/testing/gostats";
+my $stats_dir="/home/terdon/research/testing/gostats";
 my $geneology_file="biological_process.genealogy";
 my $cwd=cwd();
 my $print_gos=$opts{g}|| undef;

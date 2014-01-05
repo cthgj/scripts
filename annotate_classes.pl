@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# use lib "/home/cchapple/lib";
+# use lib "/home/terdon/lib";
 # use moon_cand;
 use strict;
 use Getopt::Std;

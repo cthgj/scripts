@@ -6,7 +6,7 @@ use Getopt::Std;
 my (%opts,%synonyms,%interactors,%terms_to_GOs,%want);
 getopts('hT:N:o:s:O:D:',\%opts);
 $synonyms{LOADED}=0;
-my $DATADIR=$opts{D}||"/home/cchapple/research/testing/new/data";
+my $DATADIR=$opts{D}||"/home/terdon/research/testing/new/data";
 my $synfile=$opts{s}||"$DATADIR/hs.uni2acc.map";
 my $net_file=$opts{N}||"$DATADIR/../HSHQ.gr";
 my $cand=$ARGV[0]||die "USAGE:\n\t$0 <cand_prot>";

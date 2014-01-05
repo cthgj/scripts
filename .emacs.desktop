@@ -17,7 +17,7 @@
 
 ;; Buffer section -- buffers listed in same order as in buffer list:
 (desktop-create-buffer 206
-  "/home/cchapple/scripts/psicquic_wrapper.pl"
+  "/home/terdon/scripts/psicquic_wrapper.pl"
   "psicquic_wrapper.pl"
   'cperl-mode
   '(abbrev-mode ecb-minor-mode yas/minor-mode)

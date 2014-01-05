@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# use lib "/home/cchapple/lib";
+# use lib "/home/terdon/lib";
 # use moon_cand;
 ##
 ## SSH TUNNEL : ssh -fN -p 24222 cchapple@139.124.66.43 -L 3307:10.1.3.30:3306

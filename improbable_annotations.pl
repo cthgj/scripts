@@ -7,7 +7,7 @@ my %opts;
 getopts('hvo:g:G:',\%opts) || do { print "Invalid option, try '$0 -h' for more information\n"; exit(1); };
 
 my %go_pairs;
-my $geneology_file=$opts{g}||"/home/cchapple/research/GO/biological_process.geneology";
+my $geneology_file=$opts{g}||"/home/terdon/research/GO/biological_process.geneology";
 my $gaf_file=$opts{G}||"./data/gene_association.human";
 my $verbose=$opts{v}||undef;
 my $subonto=$opts{o}||"P";
