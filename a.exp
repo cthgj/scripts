@@ -1,7 +1,0 @@
-#!/usr/bin/expect
-
-spawn telnet docs.python.org 80
-expect "Escape character is '^]'." { 
-    send "GET /2/license.html HTTP/1.1\nHost: docs.python.org\n\n" 
-}
-interact
